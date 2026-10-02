@@ -1,32 +1,39 @@
 #include <Servo.h>
 
-Servo myservo;
-int pos = 0;
-int current_time = 0;
+Servo servo1;   // pan servo
+Servo servo2;   // tilt servo
+int pos_s1 = 0;
+int pos_s2 = 0;
+int temp_pos_counter = 0;
+int increment = 1;
 
 void setup() {
   Serial.begin(9600);
-  myservo.attach(9);
+  servo1.attach(3);   // pin D3
+  servo2.attach(4);   // pin D4
 }
 
 void loop() {
-  for (pos = 0; pos <= 180; pos += 1) {
-    myservo.write(pos);
-    log_info();
-    delay(15);
+  if (temp_pos_counter <= 180 && temp_pos_counter >= 0) {
+    temp_pos_counter += increment;
   }
-  for (pos = 180; pos >= 0; pos -= 1) {
-    myservo.write(pos);
-    log_info();
-    delay(15);
+  else {
+    increment *= -1;
+    temp_pos_counter += increment;
   }
+  
+  servo1.write(get_s1_pos());
+  servo2.write(get_s2_pos());
+
+  delay(20);
 
 }
 
-void log_info() {
-  current_time = millis();
-  Serial.print("At ");
-  Serial.print(current_time);
-  Serial.print(" position is: ");
-  Serial.println(pos);
+int get_s1_pos() {
+  return temp_pos_counter;
 }
+
+int get_s2_pos() {
+  return temp_pos_counter;
+}
+
