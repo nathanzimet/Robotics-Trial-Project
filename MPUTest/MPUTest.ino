@@ -1,23 +1,14 @@
 #include <Wire.h>
+#include "GyroAxis.h"
 
-#define SAMPLE_SIZE 128
+#define TICK_RATE 10
+
 int printcounter = 0;
-
 int MPU_addr = 0x68;
 
-int16_t gyr_x;
-int16_t gyr_y;
-int16_t gyr_z;
-
-// Offset is mean from first 128 samples
-int16_t off_gyr_x;
-int16_t off_gyr_y;
-int16_t off_gyr_z;
-
-int index_z = 0;
-int16_t samples_z[SAMPLE_SIZE];
-int32_t sum_z = 0;
-int16_t mean_z;
+GyroAxis gyr_x;
+GyroAxis gyr_y;
+GyroAxis gyr_z;
 
 void setup() {
   Serial.begin(9600);
@@ -49,14 +40,16 @@ void loop() {
   Wire.endTransmission(false);
   Wire.requestFrom(MPU_addr, 6, true);
   
-  read_high_low(gyr_x);
-  read_high_low(gyr_y);
-  read_high_low(gyr_z);
+  read_high_low(gyr_x.raw);
+  read_high_low(gyr_y.raw);
+  read_high_low(gyr_z.raw);
 
-  if (printcounter % 100 == 0) print_gyr();
-  update_samples_z();
+  if (printcounter % (TICK_RATE * 5) == 0) print_gyr();
+  gyr_x.update_samples();
+  gyr_y.update_samples();
+  gyr_z.update_samples();
 
-  delay(10);
+  delay(TICK_RATE);
 }
 
 void calibrate() {
@@ -67,18 +60,23 @@ void calibrate() {
     Wire.endTransmission(false);
     Wire.requestFrom(MPU_addr, 6, true);
   
-    read_high_low(gyr_x);
-    read_high_low(gyr_y);
-    read_high_low(gyr_z);
+    read_high_low(gyr_x.raw);
+    read_high_low(gyr_y.raw);
+    read_high_low(gyr_z.raw);
 
     // Populate sample tables, create sum
-    samples_z[i] = gyr_z;
-    sum_z += gyr_z;
+    gyr_x.samples[i] = gyr_x.raw;
+    gyr_y.samples[i] = gyr_y.raw;
+    gyr_z.samples[i] = gyr_z.raw;
+    gyr_x.sum += gyr_x.raw;
+    gyr_y.sum += gyr_y.raw;
+    gyr_z.sum += gyr_z.raw;
     
     delay(4);
   }
-  mean_z = sum_z / SAMPLE_SIZE;
-  off_gyr_z = mean_z;
+  gyr_x.mean = gyr_x.offset = gyr_x.sum / SAMPLE_SIZE;
+  gyr_y.mean = gyr_y.offset = gyr_y.sum / SAMPLE_SIZE;
+  gyr_z.mean = gyr_z.offset = gyr_z.sum / SAMPLE_SIZE;
 }
 
 void read_high_low(int16_t &var) {
@@ -90,24 +88,12 @@ void read_high_low(int16_t &var) {
   var = highbits + lowbits;
 }
 
-void update_samples_z() {
-  sum_z -= samples_z[index_z];  // remove oldest from sum
-  samples_z[index_z] = gyr_z;   // update arr with newest
-  sum_z += samples_z[index_z];  // add newest to sum
-  index_z++;                    // increment index_z
-  if (index_z == SAMPLE_SIZE)
-    index_z = 0;
-  mean_z = sum_z / SAMPLE_SIZE; // recalc mean
-}
-
 void print_gyr() {
-  Serial.print("index_z: ");
-  Serial.print(index_z);
-  Serial.print(", sum: ");
-  Serial.print(sum_z);
-  Serial.print(", last: ");
-  Serial.print(samples_z[index_z]);
-  Serial.print(", mean: ");
-  Serial.println(mean_z);
-
+  Serial.print("Raw sample rolling mean: (x=");
+  Serial.print(gyr_x.mean - gyr_x.offset);
+  Serial.print(", y=");
+  Serial.print(gyr_y.mean - gyr_y.offset);
+  Serial.print(", z=");
+  Serial.print(gyr_z.mean - gyr_z.offset);
+  Serial.println(")");
 }
