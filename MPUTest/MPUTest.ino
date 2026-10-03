@@ -1,7 +1,7 @@
 #include <Wire.h>
 #include "GyroAxis.h"
 
-#define TICK_RATE 10
+#define TICK_RATE 2
 
 int printcounter = 0;
 int MPU_addr = 0x68;
@@ -44,10 +44,20 @@ void loop() {
   read_high_low(gyr_y.raw);
   read_high_low(gyr_z.raw);
 
-  if (printcounter % (TICK_RATE * 5) == 0) print_gyr();
+  //if (printcounter % (TICK_RATE * 5) == 0) print_gyr();
   gyr_x.update_samples();
   gyr_y.update_samples();
   gyr_z.update_samples();
+
+  if (printcounter % (TICK_RATE * 10) == 0) {
+    Serial.print("(x=");
+    gyr_x.print_info();
+    Serial.print(", y=");
+    gyr_y.print_info();
+    Serial.print(", z=");
+    gyr_z.print_info();
+    Serial.println(")");
+  }
 
   delay(TICK_RATE);
 }
