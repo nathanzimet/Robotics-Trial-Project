@@ -8,7 +8,7 @@
 
 class GyroAxis {
   private:
-    int index;
+    int index;        // of current sample in rotating array
   public:
     int16_t raw;
     int16_t offset;   // mean of very first sample
@@ -16,9 +16,10 @@ class GyroAxis {
     int32_t sum;
     int16_t mean;
 
-    // recalculated from int sum, mean every tick to avoid fp error
+    // recalculated from integer sum, mean every tick to avoid fp error
+    // scaled from MPU output range into degrees per second.
     float scaled_sum;   
-    float scaled_mean;
+    float scaled_mean;  // what is actually used for servo position
 
     GyroAxis();
     void update_samples();
