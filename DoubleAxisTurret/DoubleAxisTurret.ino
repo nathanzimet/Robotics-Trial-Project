@@ -26,7 +26,6 @@ int hidden_pos_s2 = 90;
 
 // IMU variables
 int MPU_addr = 0x68;
-
 GyroAxis gyr_x;
 GyroAxis gyr_y;
 GyroAxis gyr_z;
