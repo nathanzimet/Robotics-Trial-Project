@@ -1,13 +1,23 @@
 #include <Wire.h>
 
+#define SAMPLE_SIZE 128
+int printcounter = 0;
+
 int MPU_addr = 0x68;
 
-int16_t acc_x;
-int16_t acc_y;
-int16_t acc_z;
 int16_t gyr_x;
 int16_t gyr_y;
 int16_t gyr_z;
+
+// Offset is mean from first 128 samples
+int16_t off_gyr_x;
+int16_t off_gyr_y;
+int16_t off_gyr_z;
+
+int index_z = 0;
+int16_t samples_z[SAMPLE_SIZE];
+int32_t sum_z = 0;
+int16_t mean_z;
 
 void setup() {
   Serial.begin(9600);
@@ -19,18 +29,19 @@ void setup() {
   Wire.write(0x00);   //wake up from sleep
   Wire.endTransmission(true);
 
+  // Set gyro to output
+  Wire.beginTransmission(MPU_addr);
+  Wire.write(0x1B);   //GYR_CONFIG
+  Wire.write(0x00);   //+=250 degrees per second
+  Wire.endTransmission(true);
+
+  // get first 128 samples for initial sum and mean
+  calibrate();
+
 }
 
 void loop() {
-  // Accelerometer reading
-  Wire.beginTransmission(MPU_addr);
-  Wire.write(0x3B);   // reg [3B:40] 
-  Wire.endTransmission(false);
-  Wire.requestFrom(MPU_addr, 6, true);
-  
-  read_high_low(acc_x);
-  read_high_low(acc_y);
-  read_high_low(acc_z);
+  printcounter++;
 
   // Gyroscope reading
   Wire.beginTransmission(MPU_addr);
@@ -42,12 +53,32 @@ void loop() {
   read_high_low(gyr_y);
   read_high_low(gyr_z);
 
-  print_acc();
-  print_gyr();
-  Serial.println("--------");
+  if (printcounter % 100 == 0) print_gyr();
+  update_samples_z();
 
-  delay(1000);
+  delay(10);
+}
 
+void calibrate() {
+  for (int i = 0; i < SAMPLE_SIZE; i++) {
+    // Normal register read
+    Wire.beginTransmission(MPU_addr);
+    Wire.write(0x43); 
+    Wire.endTransmission(false);
+    Wire.requestFrom(MPU_addr, 6, true);
+  
+    read_high_low(gyr_x);
+    read_high_low(gyr_y);
+    read_high_low(gyr_z);
+
+    // Populate sample tables, create sum
+    samples_z[i] = gyr_z;
+    sum_z += gyr_z;
+    
+    delay(4);
+  }
+  mean_z = sum_z / SAMPLE_SIZE;
+  off_gyr_z = mean_z;
 }
 
 void read_high_low(int16_t &var) {
@@ -59,20 +90,24 @@ void read_high_low(int16_t &var) {
   var = highbits + lowbits;
 }
 
-void print_acc() {
-  Serial.print("ACC (x, y, z): ");
-  Serial.print(acc_x);
-  Serial.print(",  ");
-  Serial.print(acc_y);
-  Serial.print(", ");
-  Serial.println(acc_z);
+void update_samples_z() {
+  sum_z -= samples_z[index_z];  // remove oldest from sum
+  samples_z[index_z] = gyr_z;   // update arr with newest
+  sum_z += samples_z[index_z];  // add newest to sum
+  index_z++;                    // increment index_z
+  if (index_z == SAMPLE_SIZE)
+    index_z = 0;
+  mean_z = sum_z / SAMPLE_SIZE; // recalc mean
 }
 
 void print_gyr() {
-  Serial.print("GYR (x, y, z): ");
-  Serial.print(gyr_x);
-  Serial.print(",  ");
-  Serial.print(gyr_y);
-  Serial.print(", ");
-  Serial.println(gyr_z);
+  Serial.print("index_z: ");
+  Serial.print(index_z);
+  Serial.print(", sum: ");
+  Serial.print(sum_z);
+  Serial.print(", last: ");
+  Serial.print(samples_z[index_z]);
+  Serial.print(", mean: ");
+  Serial.println(mean_z);
+
 }
